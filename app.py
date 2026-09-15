@@ -87,6 +87,16 @@ def ensure_tables():
             created_at DATETIME2 DEFAULT SYSDATETIME()
         )
     """)
+    cur.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'actions')
+        CREATE TABLE actions (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            title NVARCHAR(300) NOT NULL,
+            due NVARCHAR(40) NULL,
+            done BIT NOT NULL DEFAULT 0,
+            created_at DATETIME2 DEFAULT SYSDATETIME()
+        )
+    """)
     # Seed sample rows only if the tables are empty, so the demo looks populated.
     cur.execute("SELECT COUNT(*) FROM tickets")
     if cur.fetchone()[0] == 0:
@@ -110,6 +120,16 @@ def ensure_tables():
         ]
         for row in seed:
             cur.execute("INSERT INTO contacts (name, dealer, email) VALUES (?,?,?)", *row)
+    cur.execute("SELECT COUNT(*) FROM actions")
+    if cur.fetchone()[0] == 0:
+        seed = [
+            ("Assign the two unassigned high-priority tickets", "Today", 0),
+            ("Approve TPS Birmingham new-starter accounts", "Today", 0),
+            ("Review LEAP module 4 feedback with content team", "Tomorrow", 0),
+            ("Send March pre-booking targeting to CUPRA sites", "Fri", 1),
+        ]
+        for row in seed:
+            cur.execute("INSERT INTO actions (title, due, done) VALUES (?,?,?)", *row)
 
 
 def fetch_all():
@@ -125,10 +145,16 @@ def fetch_all():
     cur.execute("SELECT id, name, dealer, email FROM contacts ORDER BY id DESC")
     contacts = [dict(id=r[0], name=r[1], dealer=r[2], email=r[3]) for r in cur.fetchall()]
 
+    # Actions: not-done first (newest first within each group)
+    cur.execute("SELECT id, title, due, done FROM actions ORDER BY done ASC, id DESC")
+    action_items = [dict(id=r[0], title=r[1], due=r[2], done=bool(r[3])) for r in cur.fetchall()]
+
     open_count = sum(1 for t in tickets if t["status"] == "open")
     high_count = sum(1 for t in tickets if t["priority"] == "high")
-    return dict(tickets=tickets, contacts=contacts,
+    open_action_count = sum(1 for a in action_items if not a["done"])
+    return dict(tickets=tickets, contacts=contacts, action_items=action_items,
                 open_count=open_count, high_count=high_count,
+                open_action_count=open_action_count,
                 ticket_count=len(tickets), contact_count=len(contacts))
 
 
@@ -156,13 +182,16 @@ ICONS = dict(
     ico_hub=_svg("M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"),
     ico_audit=_svg("M9 4H7a1 1 0 0 0-1 1v15a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2",
                    "M9 3h6v3H9z", "M9 12h6M9 16h4"),
+    ico_check=('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" '
+               'stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5L20 7"/></svg>'),
 )
 
 
 @app.route("/")
 def home():
     error = ""
-    data = dict(tickets=[], contacts=[], open_count=0, high_count=0, ticket_count=0, contact_count=0)
+    data = dict(tickets=[], contacts=[], action_items=[], open_count=0, high_count=0,
+                open_action_count=0, ticket_count=0, contact_count=0)
     try:
         ensure_tables()
         data = fetch_all()
@@ -201,6 +230,32 @@ def add_contact():
         except Exception:
             pass
     return redirect("/#contacts")
+
+
+@app.route("/add-action", methods=["POST"])
+def add_action():
+    title = (request.form.get("title") or "").strip()
+    due = (request.form.get("due") or "").strip()
+    if title:
+        try:
+            cur = get_cursor()
+            cur.execute("INSERT INTO actions (title, due, done) VALUES (?,?,0)", title, due)
+        except Exception:
+            pass
+    return redirect("/#actions")
+
+
+@app.route("/toggle-action", methods=["POST"])
+def toggle_action():
+    action_id = request.form.get("id")
+    if action_id:
+        try:
+            cur = get_cursor()
+            # Flip the done flag for this row.
+            cur.execute("UPDATE actions SET done = 1 - done WHERE id = ?", int(action_id))
+        except Exception:
+            pass
+    return redirect("/#actions")
 
 
 @app.route("/health")

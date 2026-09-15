@@ -48,6 +48,7 @@
   .nav a{display:flex;align-items:center;gap:11px;width:100%;border-left:3px solid transparent;color:var(--text-muted);font-size:13.5px;font-weight:600;padding:11px 12px;cursor:pointer;transition:background .2s}
   .nav a:hover{background:var(--surface-sunken);color:var(--text-heading);text-decoration:none}
   .nav a.active{background:var(--accent-soft);border-left-color:var(--accent);color:var(--accent)}
+  .nav a.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
   .nav a .count{margin-left:auto;font-size:12px;font-weight:500;background:var(--grey-300);color:var(--grey-800);padding:2px 8px;border-radius:var(--radius-pill)}
   .nav a .count.live{background:var(--accent);color:var(--accent-on)}
   .nav a.active .ico{color:var(--accent)}
@@ -119,6 +120,16 @@
   .field input,.field select{width:100%;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:0 12px;height:var(--control-h-sm);background:var(--surface-page);color:var(--text-body)}
   .addform .actions{display:flex;gap:10px;align-items:center}
 
+  /* Live actions */
+  .action-row{display:flex;align-items:flex-start;gap:12px;padding:13px 20px;border-bottom:1px solid var(--border-subtle)}
+  .action-row:last-child{border-bottom:none}
+  .action-row .cbx{width:20px;height:20px;border-radius:var(--radius-sm);border:1px solid var(--border-strong);background:var(--surface-page);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;margin-top:1px}
+  .action-row .cbx.done{background:var(--green-600);border-color:var(--green-600);color:#fff}
+  .action-row .cbx svg{width:12px;height:12px}
+  .action-row .a-title{font-size:13px;font-weight:600;color:var(--text-heading)}
+  .action-row.is-done .a-title{text-decoration:line-through;color:var(--grey-500)}
+  .action-row .a-meta{font-size:12px;color:var(--text-muted);margin-top:2px}
+
   /* Activity */
   .activity{padding:10px 0}
   .activity .row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;padding:8px 20px}
@@ -155,17 +166,17 @@
       <a href="#" class="active">{{ ico_home | safe }} Dashboard</a>
       <a href="#contact">{{ ico_contact | safe }} Contact <span class="count live">{{ open_count }}</span></a>
       <a href="#contacts">{{ ico_users | safe }} Contacts <span class="count live">{{ contact_count }}</span></a>
-      <a href="#">{{ ico_reports | safe }} Reports</a>
-      <a href="#">{{ ico_forms | safe }} Forms</a>
-      <a href="#">{{ ico_actions | safe }} Actions <span class="count">3</span></a>
-      <a href="#">{{ ico_comm | safe }} Communication</a>
-      <a href="#">{{ ico_know | safe }} Knowledge centre</a>
-      <a href="#">{{ ico_target | safe }} Targeting</a>
-      <a href="#">{{ ico_pbi | safe }} Power BI</a>
-      <a href="#">{{ ico_reviews | safe }} Reviews</a>
-      <a href="#">{{ ico_dealers | safe }} Dealers</a>
-      <a href="#">{{ ico_hub | safe }} The hub</a>
-      <a href="#">{{ ico_audit | safe }} Audit logs</a>
+      <a href="#actions">{{ ico_actions | safe }} Actions <span class="count live">{{ open_action_count }}</span></a>
+      <a class="disabled" aria-disabled="true">{{ ico_reports | safe }} Reports</a>
+      <a class="disabled" aria-disabled="true">{{ ico_forms | safe }} Forms</a>
+      <a class="disabled" aria-disabled="true">{{ ico_comm | safe }} Communication</a>
+      <a class="disabled" aria-disabled="true">{{ ico_know | safe }} Knowledge centre</a>
+      <a class="disabled" aria-disabled="true">{{ ico_target | safe }} Targeting</a>
+      <a class="disabled" aria-disabled="true">{{ ico_pbi | safe }} Power BI</a>
+      <a class="disabled" aria-disabled="true">{{ ico_reviews | safe }} Reviews</a>
+      <a class="disabled" aria-disabled="true">{{ ico_dealers | safe }} Dealers</a>
+      <a class="disabled" aria-disabled="true">{{ ico_hub | safe }} The hub</a>
+      <a class="disabled" aria-disabled="true">{{ ico_audit | safe }} Audit logs</a>
     </nav>
     <div class="rail-foot">
       <div class="whoami">
@@ -303,15 +314,39 @@
           </div>
         </div>
 
-        <!-- Side column: static mockup, as designed -->
+        <!-- Side column -->
         <div>
-          <div class="panel">
-            <div class="panel-head"><h2>Your actions</h2><span class="hint">Sample</span></div>
-            <div class="activity">
-              <div class="row"><div class="time">Today</div><div class="text">Assign the two unassigned high-priority tickets</div></div>
-              <div class="row"><div class="time">Today</div><div class="text">Approve TPS Birmingham new-starter accounts</div></div>
-              <div class="row"><div class="time">Tmrw</div><div class="text">Review LEAP module 4 feedback with content team</div></div>
+          <!-- LIVE actions -->
+          <div class="panel" id="actions">
+            <div class="panel-head">
+              <h2>Your actions</h2>
+              <span class="live-badge">Live</span>
+              <span class="hint">Tick to complete</span>
             </div>
+
+            <form class="addform" method="post" action="/add-action">
+              <div class="field"><label>New action</label><input name="title" placeholder="What needs doing?" maxlength="300" required></div>
+              <div class="field"><label>Due (optional)</label><input name="due" placeholder="e.g. Today, Fri" maxlength="40"></div>
+              <div class="actions"><button type="submit" class="btn btn-primary">Add action</button>
+                <span class="hint">Saves to Azure SQL</span></div>
+            </form>
+
+            {% for a in action_items %}
+            <div class="action-row {% if a.done %}is-done{% endif %}">
+              <form method="post" action="/toggle-action" style="margin:0;flex:none">
+                <input type="hidden" name="id" value="{{ a.id }}">
+                <button type="submit" class="cbx {% if a.done %}done{% endif %}" aria-label="Toggle done">
+                  {% if a.done %}{{ ico_check | safe }}{% endif %}
+                </button>
+              </form>
+              <div class="a-body">
+                <div class="a-title">{{ a.title }}</div>
+                <div class="a-meta">{% if a.due %}{{ a.due }}{% else %}No due date{% endif %}</div>
+              </div>
+            </div>
+            {% else %}
+            <div class="section-note">No actions yet. Add the first one above.</div>
+            {% endfor %}
           </div>
           <div class="panel">
             <div class="panel-head"><h2>Activity</h2><span class="hint">Auto-logged · sample</span></div>
