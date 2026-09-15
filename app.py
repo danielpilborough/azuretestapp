@@ -13,7 +13,7 @@ app = Flask(__name__)
 def home():
     # A version string so you can SEE a new deploy land. Bump it, push,
     # and watch the number change on the live site.
-    version = os.environ.get("APP_VERSION", "1")
+    version = os.environ.get("APP_VERSION", "2")
     return f"""
     <!doctype html>
     <html lang="en-GB">
