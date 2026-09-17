@@ -44,6 +44,12 @@
   .tag.resolved{background:var(--green-100);color:var(--green-600)}
   .t-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--grey-200);font-size:12.5px}
   .t-facts dt{color:var(--grey-500)} .t-facts dd{color:var(--grey-800);font-weight:500}
+  .assign{margin-top:14px;padding-top:14px;border-top:1px solid var(--grey-200);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .assign label{font-size:12px;font-weight:600;color:var(--grey-600)}
+  .assign select{font-family:inherit;font-size:13px;border:1px solid var(--grey-300);border-radius:var(--radius-sm);padding:0 10px;height:36px;background:#fff;color:var(--grey-800)}
+  .assign select:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .btn-sm{font-family:inherit;font-size:13px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:0 14px;height:36px;cursor:pointer}
+  .btn-sm:hover{background:var(--accent-hover)}
   .thread-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey-500);font-weight:700;margin:6px 0 12px}
   .msg{border:1px solid var(--grey-200);border-radius:var(--radius-md);padding:13px 15px;margin-bottom:12px;background:#fff}
   .msg.mine{background:var(--accent-soft);border-color:#e2d0e8}
@@ -103,6 +109,18 @@
           <dt>Assigned to</dt><dd>{{ ticket.assigned_to or 'Unassigned' }}</dd>
           <dt>Raised by</dt><dd>{{ ticket.raised_by or 'Internal' }}</dd>
         </dl>
+        {% if user.role == 'admin' %}
+        <form class="assign" method="post" action="/ticket/{{ ticket.id }}/assign">
+          <label>Assign to</label>
+          <select name="assignee">
+            <option value="">Unassigned</option>
+            {% for s in assignable %}
+            <option value="{{ s }}" {% if s == ticket.assigned_to %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-sm">Update</button>
+        </form>
+        {% endif %}
         {% endif %}
       </div>
     </div>

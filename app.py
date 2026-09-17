@@ -43,6 +43,9 @@ DEMO_USERS = {
 # In a real app this would be the logged-in person's own identity.
 USER_SCOPE_NAME = "Staff User"
 
+# Staff members an admin can assign tickets to (matches assigned_to values).
+ASSIGNABLE_STAFF = ["Staff User", "Priya S.", "Admin"]
+
 
 def login_required(view):
     """Redirect to the login page if there's no logged-in user in the session."""
@@ -430,7 +433,8 @@ def ticket_detail(ticket_id):
         if user["role"] == "dealer":
             return redirect(url_for("dealer_home"))
         return redirect(url_for("home"))
-    return render_template("ticket.html", user=user, ticket=ticket, error=error, **ICONS)
+    return render_template("ticket.html", user=user, ticket=ticket, error=error,
+                           assignable=ASSIGNABLE_STAFF, **ICONS)
 
 
 @app.route("/ticket/<int:ticket_id>/reply", methods=["POST"])
@@ -451,6 +455,30 @@ def ticket_reply(ticket_id):
     except Exception:
         pass
     # Dealers return to their own ticket view; staff to theirs.
+    return redirect(url_for("ticket_detail", ticket_id=ticket_id))
+
+
+@app.route("/ticket/<int:ticket_id>/assign", methods=["POST"])
+@login_required
+def ticket_assign(ticket_id):
+    """Admin-only: assign (or unassign) a ticket to a staff member."""
+    user = current_user()
+    if user["role"] != "admin":
+        return redirect(url_for("ticket_detail", ticket_id=ticket_id))
+    assignee = (request.form.get("assignee") or "").strip()
+    # Empty string means unassign. Otherwise it must be a known staff member.
+    new_val = assignee if assignee in ASSIGNABLE_STAFF else None
+    try:
+        ensure_tables()
+        cur = get_cursor()
+        cur.execute("UPDATE tickets SET assigned_to = ? WHERE id = ?", new_val, ticket_id)
+        # Log the change into the ticket thread so it's visible to everyone on it.
+        note = ("Ticket assigned to " + new_val) if new_val else "Ticket unassigned"
+        cur.execute(
+            "INSERT INTO messages (ticket_id, author, author_role, body) VALUES (?,?,?,?)",
+            ticket_id, user["name"], "admin", note)
+    except Exception:
+        pass
     return redirect(url_for("ticket_detail", ticket_id=ticket_id))
 
 
