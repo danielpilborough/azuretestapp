@@ -167,6 +167,8 @@
       <a href="#contact">{{ ico_contact | safe }} Contact <span class="count live">{{ open_count }}</span></a>
       {% if user.role == 'admin' %}
       <a href="#contacts">{{ ico_users | safe }} Contacts <span class="count live">{{ contact_count }}</span></a>
+      {% endif %}
+      {% if user.role in ['admin', 'user'] %}
       <a href="#actions">{{ ico_actions | safe }} Actions <span class="count live">{{ open_action_count }}</span></a>
       {% endif %}
       <a href="/help">{{ ico_forms | safe }} Help &amp; tickets</a>
@@ -271,7 +273,7 @@
             </form>
 
             {% for t in tickets %}
-            <div class="ticket">
+            <a href="/ticket/{{ t.id }}" class="ticket" style="text-decoration:none;color:inherit">
               <div class="bar {{ t.priority }}"></div>
               <div>
                 <div class="sub">{{ t.subject }}</div>
@@ -283,7 +285,7 @@
               <div class="side">
                 <span class="tag {{ t.status }}">{{ {'open':'Open','pending':'Pending','progress':'In progress','resolved':'Resolved'}.get(t.status, t.status) }}</span>
               </div>
-            </div>
+            </a>
             {% else %}
             <div class="section-note">No tickets yet. Add the first one above.</div>
             {% endfor %}
@@ -323,11 +325,11 @@
 
         <!-- Side column -->
         <div>
-          <!-- LIVE actions (admin only) -->
-          {% if user.role == 'admin' %}
+          <!-- LIVE actions (admin sees all, user sees their own) -->
+          {% if user.role in ['admin', 'user'] %}
           <div class="panel" id="actions">
             <div class="panel-head">
-              <h2>Your actions</h2>
+              <h2>{% if user.role == 'user' %}My actions{% else %}Your actions{% endif %}</h2>
               <span class="live-badge">Live</span>
               <span class="hint">Tick to complete</span>
             </div>
@@ -356,6 +358,9 @@
             <div class="section-note">No actions yet. Add the first one above.</div>
             {% endfor %}
           </div>
+          {% endif %}
+
+          {% if user.role == 'admin' %}
           <div class="panel">
             <div class="panel-head"><h2>Activity</h2><span class="hint">Auto-logged · sample</span></div>
             <div class="activity">
@@ -364,11 +369,6 @@
               <div class="row"><div class="time">11:27</div><div class="text">Delegate review ended for J. Ali</div></div>
               <div class="row"><div class="time">11:03</div><div class="text">Delegate review started for R. Green</div></div>
             </div>
-          </div>
-          {% else %}
-          <div class="panel">
-            <div class="panel-head"><h2>Your workload</h2><span class="live-badge">Live</span></div>
-            <div class="section-note" style="border-top:none">You're seeing tickets assigned to you plus anything unassigned. Contacts, actions and the wider activity feed are admin-only.</div>
           </div>
           {% endif %}
         </div>

@@ -141,6 +141,23 @@ def ensure_tables():
             title NVARCHAR(300) NOT NULL,
             due NVARCHAR(40) NULL,
             done BIT NOT NULL DEFAULT 0,
+            owner NVARCHAR(200) NULL,
+            created_at DATETIME2 DEFAULT SYSDATETIME()
+        )
+    """)
+    cur.execute("""
+        IF COL_LENGTH('actions', 'owner') IS NULL
+        ALTER TABLE actions ADD owner NVARCHAR(200) NULL
+    """)
+    # Messages: the conversation thread on a ticket.
+    cur.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'messages')
+        CREATE TABLE messages (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            ticket_id INT NOT NULL,
+            author NVARCHAR(200) NOT NULL,
+            author_role NVARCHAR(20) NOT NULL,
+            body NVARCHAR(2000) NOT NULL,
             created_at DATETIME2 DEFAULT SYSDATETIME()
         )
     """)
@@ -171,21 +188,36 @@ def ensure_tables():
             cur.execute("INSERT INTO contacts (name, dealer, email) VALUES (?,?,?)", *row)
     cur.execute("SELECT COUNT(*) FROM actions")
     if cur.fetchone()[0] == 0:
+        # (title, due, done, owner)
         seed = [
-            ("Assign the two unassigned high-priority tickets", "Today", 0),
-            ("Approve TPS Birmingham new-starter accounts", "Today", 0),
-            ("Review LEAP module 4 feedback with content team", "Tomorrow", 0),
-            ("Send March pre-booking targeting to CUPRA sites", "Fri", 1),
+            ("Assign the two unassigned high-priority tickets", "Today", 0, "Staff User"),
+            ("Approve TPS Birmingham new-starter accounts", "Today", 0, "Priya S."),
+            ("Review LEAP module 4 feedback with content team", "Tomorrow", 0, "Staff User"),
+            ("Send March pre-booking targeting to CUPRA sites", "Fri", 1, "Priya S."),
+            ("Chase Sytner Audi certificate query", "Today", 0, "Staff User"),
         ]
         for row in seed:
-            cur.execute("INSERT INTO actions (title, due, done) VALUES (?,?,?)", *row)
+            cur.execute("INSERT INTO actions (title, due, done, owner) VALUES (?,?,?,?)", *row)
+    # Seed a couple of messages so a ticket thread looks populated in the demo.
+    cur.execute("SELECT COUNT(*) FROM messages")
+    if cur.fetchone()[0] == 0:
+        cur.execute("SELECT TOP 1 id FROM tickets WHERE raised_by = 'Dealer' ORDER BY id")
+        row = cur.fetchone()
+        if row:
+            tid = row[0]
+            seed_msgs = [
+                (tid, "Dealer", "dealer", "Hi, my accreditation certificate still isn't showing after completing the module. Can you help?"),
+                (tid, "Staff User", "user", "Thanks for flagging - I can see the completion on our side. Looking into why the certificate hasn't generated."),
+            ]
+            for m in seed_msgs:
+                cur.execute("INSERT INTO messages (ticket_id, author, author_role, body) VALUES (?,?,?,?)", *m)
 
 
 def fetch_all(role="admin"):
     """
     Read the live data, filtered by role, and derive stats.
-      admin  - every ticket
-      user   - only tickets assigned to them, or unassigned (their workload)
+      admin  - every ticket and every action
+      user   - only tickets assigned to them, and only their own actions
       dealer - only tickets they raised
     The filtering is real SQL (a WHERE clause), not a cosmetic hide.
     """
@@ -200,8 +232,8 @@ def fetch_all(role="admin"):
     if role == "dealer":
         cur.execute(base + " WHERE raised_by = ?" + order, "Dealer")
     elif role == "user":
-        # Their own assigned work, plus anything unassigned (up for grabs).
-        cur.execute(base + " WHERE assigned_to = ? OR assigned_to IS NULL" + order, USER_SCOPE_NAME)
+        # Only tickets assigned to them.
+        cur.execute(base + " WHERE assigned_to = ?" + order, USER_SCOPE_NAME)
     else:  # admin
         cur.execute(base + order)
 
@@ -212,8 +244,12 @@ def fetch_all(role="admin"):
     cur.execute("SELECT id, name, dealer, email FROM contacts ORDER BY id DESC")
     contacts = [dict(id=r[0], name=r[1], dealer=r[2], email=r[3]) for r in cur.fetchall()]
 
-    cur.execute("SELECT id, title, due, done FROM actions ORDER BY done ASC, id DESC")
-    action_items = [dict(id=r[0], title=r[1], due=r[2], done=bool(r[3])) for r in cur.fetchall()]
+    # Actions: admin sees all; user sees only their own.
+    if role == "user":
+        cur.execute("SELECT id, title, due, done, owner FROM actions WHERE owner = ? ORDER BY done ASC, id DESC", USER_SCOPE_NAME)
+    else:
+        cur.execute("SELECT id, title, due, done, owner FROM actions ORDER BY done ASC, id DESC")
+    action_items = [dict(id=r[0], title=r[1], due=r[2], done=bool(r[3]), owner=r[4]) for r in cur.fetchall()]
 
     open_count = sum(1 for t in tickets if t["status"] == "open")
     high_count = sum(1 for t in tickets if t["priority"] == "high")
@@ -222,6 +258,34 @@ def fetch_all(role="admin"):
                 open_count=open_count, high_count=high_count,
                 open_action_count=open_action_count,
                 ticket_count=len(tickets), contact_count=len(contacts))
+
+
+def get_ticket(ticket_id, role):
+    """Fetch a single ticket + its message thread, enforcing the role's access."""
+    cur = get_cursor()
+    cur.execute("""
+        SELECT id, subject, requester, site, channel, priority, status, assigned_to, raised_by
+        FROM tickets WHERE id = ?
+    """, ticket_id)
+    r = cur.fetchone()
+    if not r:
+        return None
+    t = dict(id=r[0], subject=r[1], requester=r[2], site=r[3], channel=r[4],
+             priority=r[5], status=r[6], assigned_to=r[7], raised_by=r[8])
+    # Access control: can this role see this ticket?
+    if role == "dealer" and t["raised_by"] != "Dealer":
+        return None
+    if role == "user" and t["assigned_to"] != USER_SCOPE_NAME:
+        return None
+    # admin sees any
+    cur.execute("SELECT author, author_role, body, created_at FROM messages WHERE ticket_id = ? ORDER BY id", ticket_id)
+    t["messages"] = [dict(author=m[0], role=m[1], body=m[2], created_at=m[3]) for m in cur.fetchall()]
+    return t
+
+
+def add_owner_to_new_action(title, due, owner):
+    cur = get_cursor()
+    cur.execute("INSERT INTO actions (title, due, done, owner) VALUES (?,?,0,?)", title, due, owner)
 
 
 # Small inline SVG icons for the nav, matching the design's line style.
@@ -349,6 +413,47 @@ def help_page():
     return render_template("help.html", user=user, sent=sent, **ICONS)
 
 
+@app.route("/ticket/<int:ticket_id>")
+@login_required
+def ticket_detail(ticket_id):
+    """View a single ticket and its conversation thread."""
+    user = current_user()
+    error = ""
+    ticket = None
+    try:
+        ensure_tables()
+        ticket = get_ticket(ticket_id, user["role"])
+    except Exception as e:
+        error = str(e)
+    if ticket is None and not error:
+        # Not found, or this role isn't allowed to see it.
+        if user["role"] == "dealer":
+            return redirect(url_for("dealer_home"))
+        return redirect(url_for("home"))
+    return render_template("ticket.html", user=user, ticket=ticket, error=error, **ICONS)
+
+
+@app.route("/ticket/<int:ticket_id>/reply", methods=["POST"])
+@login_required
+def ticket_reply(ticket_id):
+    """Post a reply into a ticket's thread."""
+    user = current_user()
+    body = (request.form.get("body") or "").strip()
+    try:
+        ensure_tables()
+        # Re-check access before writing: the role must be allowed to see this ticket.
+        ticket = get_ticket(ticket_id, user["role"])
+        if ticket is not None and body:
+            cur = get_cursor()
+            cur.execute(
+                "INSERT INTO messages (ticket_id, author, author_role, body) VALUES (?,?,?,?)",
+                ticket_id, user["name"], user["role"], body)
+    except Exception:
+        pass
+    # Dealers return to their own ticket view; staff to theirs.
+    return redirect(url_for("ticket_detail", ticket_id=ticket_id))
+
+
 @app.route("/add-contact", methods=["POST"])
 @login_required
 def add_contact():
@@ -367,12 +472,16 @@ def add_contact():
 @app.route("/add-action", methods=["POST"])
 @login_required
 def add_action():
+    user = current_user()
     title = (request.form.get("title") or "").strip()
     due = (request.form.get("due") or "").strip()
+    # New actions belong to whoever created them. Admin-created ones are owned
+    # by the admin; user-created ones by the user's scope name.
+    owner = USER_SCOPE_NAME if user["role"] == "user" else "Admin"
     if title:
         try:
             cur = get_cursor()
-            cur.execute("INSERT INTO actions (title, due, done) VALUES (?,?,0)", title, due)
+            cur.execute("INSERT INTO actions (title, due, done, owner) VALUES (?,?,0,?)", title, due, owner)
         except Exception:
             pass
     return redirect("/#actions")

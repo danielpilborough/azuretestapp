@@ -119,14 +119,14 @@
       <div class="panel">
         <div class="panel-head"><h2>My queries</h2><span class="hint">Everything you've raised</span></div>
         {% for t in tickets %}
-        <div class="q">
+        <a href="/ticket/{{ t.id }}" class="q" style="text-decoration:none;color:inherit">
           <div class="bar {{ t.priority }}"></div>
           <div>
             <div class="subj">{{ t.subject }}</div>
             <div class="meta">{{ t.requester }}{% if t.site %} · {{ t.site }}{% endif %}</div>
           </div>
           <div><span class="tag {{ t.status }}">{{ {'open':'Open','pending':'Pending','progress':'In progress','resolved':'Resolved'}.get(t.status, t.status) }}</span></div>
-        </div>
+        </a>
         {% else %}
         <div class="empty">You haven't raised any queries yet. Use the form above.</div>
         {% endfor %}

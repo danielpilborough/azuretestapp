@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ticket · Compas</title>
+<style>
+  :root{
+    --ink-900:#0C1116; --purple-700:#3E2248; --purple-600:#452450; --purple-500:#4F2A59;
+    --purple-100:#F2EAF4; --white:#FFFFFF; --grey-50:#F6F8FA; --grey-100:#EDF1F5;
+    --grey-200:#DDE3EA; --grey-300:#C3CCD6; --grey-500:#7C8A98; --grey-600:#5D6B78; --grey-800:#333E48;
+    --green-600:#1C7A4A; --green-100:#E4F3EB; --amber-600:#B26A00; --amber-100:#FBF0DC;
+    --red-600:#B3261E; --red-100:#FBE7E5;
+    --accent:var(--purple-500); --accent-hover:var(--purple-700); --accent-on:#fff; --accent-soft:var(--purple-100);
+    --radius-sm:4px; --radius-md:8px; --radius-pill:999px; --control-h:42px;
+    --shadow-sm:0 1px 2px rgba(12,17,22,.06),0 1px 1px rgba(12,17,22,.04);
+    --font:"Archivo","Segoe UI",Roboto,Helvetica,Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);font-size:14px;line-height:1.55;background:var(--grey-50);color:var(--grey-800);-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-weight:700;letter-spacing:-0.01em;color:var(--ink-900)}
+  a{color:var(--accent);text-decoration:none}
+  .topbar{background:var(--purple-500);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:14px}
+  .topbar .mark{font-weight:700;font-size:20px;letter-spacing:-0.02em}
+  .topbar .sub{font-size:12px;color:var(--purple-100);opacity:.9}
+  .topbar .who{margin-left:auto;font-size:12.5px;color:var(--purple-100);display:flex;align-items:center;gap:14px}
+  .topbar .who a{color:#fff;text-decoration:none;font-weight:600;opacity:.85}
+  .wrap{max-width:760px;margin:0 auto;padding:24px 24px 56px}
+  .crumb{font-size:12.5px;color:var(--grey-600);margin-bottom:16px}
+  .crumb a{font-weight:600}
+  .err{background:var(--red-100);color:var(--red-600);border:1px solid #f2c4c0;border-radius:var(--radius-md);padding:13px 16px;font-size:13px;margin-bottom:20px;word-break:break-word}
+  .panel{background:var(--white);border:1px solid var(--grey-200);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);overflow:hidden;margin-bottom:22px}
+  .t-head{padding:20px}
+  .t-head .row{display:flex;align-items:flex-start;gap:12px}
+  .t-head .bar{width:4px;align-self:stretch;border-radius:2px;min-height:44px}
+  .bar.high{background:var(--red-600)} .bar.med{background:var(--amber-600)} .bar.low{background:var(--grey-300)}
+  .t-head h1{font-size:19px;line-height:1.25}
+  .t-head .meta{font-size:12.5px;color:var(--grey-600);margin-top:6px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .chip{font-size:11px;font-weight:600;background:var(--grey-100);color:var(--grey-600);padding:3px 8px;border-radius:var(--radius-pill)}
+  .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:var(--radius-sm)}
+  .tag.open{background:var(--red-100);color:var(--red-600)}
+  .tag.pending{background:var(--amber-100);color:var(--amber-600)}
+  .tag.progress{background:var(--accent-soft);color:var(--accent)}
+  .tag.resolved{background:var(--green-100);color:var(--green-600)}
+  .t-facts{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;margin-top:14px;padding-top:14px;border-top:1px solid var(--grey-200);font-size:12.5px}
+  .t-facts dt{color:var(--grey-500)} .t-facts dd{color:var(--grey-800);font-weight:500}
+  .thread-label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--grey-500);font-weight:700;margin:6px 0 12px}
+  .msg{border:1px solid var(--grey-200);border-radius:var(--radius-md);padding:13px 15px;margin-bottom:12px;background:#fff}
+  .msg.mine{background:var(--accent-soft);border-color:#e2d0e8}
+  .msg .m-top{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+  .msg .who{font-size:12.5px;font-weight:700;color:var(--ink-900)}
+  .msg .role{font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 6px;border-radius:var(--radius-pill);background:var(--grey-100);color:var(--grey-600)}
+  .msg .role.dealer{background:var(--amber-100);color:var(--amber-600)}
+  .msg .role.staff{background:var(--accent-soft);color:var(--accent)}
+  .msg .time{margin-left:auto;font-size:11.5px;color:var(--grey-500);font-family:var(--mono)}
+  .msg .body{font-size:13.5px;color:var(--grey-800);line-height:1.55}
+  .empty{color:var(--grey-500);font-size:13px;padding:6px 0 14px}
+  .reply{border-top:1px solid var(--grey-200);padding-top:16px}
+  .reply textarea{width:100%;font-family:inherit;font-size:14px;border:1px solid var(--grey-300);border-radius:var(--radius-sm);padding:11px 13px;min-height:90px;resize:vertical;color:var(--grey-800)}
+  .reply textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .reply .row{display:flex;align-items:center;gap:12px;margin-top:12px}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:0 18px;height:var(--control-h);cursor:pointer}
+  .btn:hover{background:var(--accent-hover)}
+  .btn .hint{font-weight:400}
+  .reply .hint{font-size:12px;color:var(--grey-500)}
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="mark">Compas</div>
+    <div class="sub">{% if user.role == 'dealer' %}Dealer portal{% else %}NLC Network Hub{% endif %}</div>
+    <div class="who">
+      <span>{{ user.name }}</span>
+      <a href="/logout">Sign out</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="crumb">
+      {% if user.role == 'dealer' %}<a href="/dealer">My queries</a>{% else %}<a href="/">Dashboard</a>{% endif %}
+      › Ticket #{{ ticket.id if ticket }}
+    </div>
+
+    {% if error %}<div class="err"><b>Database error:</b> {{ error }}</div>{% endif %}
+
+    {% if ticket %}
+    <div class="panel">
+      <div class="t-head">
+        <div class="row">
+          <div class="bar {{ ticket.priority }}"></div>
+          <div style="flex:1">
+            <h1>{{ ticket.subject }}</h1>
+            <div class="meta">
+              <span class="tag {{ ticket.status }}">{{ {'open':'Open','pending':'Pending','progress':'In progress','resolved':'Resolved'}.get(ticket.status, ticket.status) }}</span>
+              <span class="chip">{{ {'email':'Email','whatsapp':'WhatsApp','phone':'Phone','ticket':'Web form'}.get(ticket.channel, ticket.channel) }}</span>
+              <span>{{ ticket.requester }}{% if ticket.site %} · {{ ticket.site }}{% endif %}</span>
+            </div>
+          </div>
+        </div>
+        {% if user.role != 'dealer' %}
+        <dl class="t-facts">
+          <dt>Priority</dt><dd>{{ ticket.priority | capitalize }}</dd>
+          <dt>Assigned to</dt><dd>{{ ticket.assigned_to or 'Unassigned' }}</dd>
+          <dt>Raised by</dt><dd>{{ ticket.raised_by or 'Internal' }}</dd>
+        </dl>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="padding:18px 20px">
+        <div class="thread-label">Conversation</div>
+        {% for m in ticket.messages %}
+        <div class="msg {% if m.author == user.name %}mine{% endif %}">
+          <div class="m-top">
+            <span class="who">{{ m.author }}</span>
+            <span class="role {% if m.role == 'dealer' %}dealer{% else %}staff{% endif %}">{{ 'Dealer' if m.role == 'dealer' else 'NLC' }}</span>
+            <span class="time">{{ m.created_at.strftime('%d %b %H:%M') if m.created_at else '' }}</span>
+          </div>
+          <div class="body">{{ m.body }}</div>
+        </div>
+        {% else %}
+        <div class="empty">No replies yet. Start the conversation below.</div>
+        {% endfor %}
+
+        <form class="reply" method="post" action="/ticket/{{ ticket.id }}/reply">
+          <textarea name="body" placeholder="{% if user.role == 'dealer' %}Reply to the NLC...{% else %}Type a reply...{% endif %}" required></textarea>
+          <div class="row">
+            <button type="submit" class="btn">Send reply</button>
+            <span class="hint">Saved to the ticket and visible to {% if user.role == 'dealer' %}the NLC{% else %}the dealer{% endif %}.</span>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</body>
+</html>
