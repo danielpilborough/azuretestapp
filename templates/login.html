@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Compas</title>
+<style>
+  :root{
+    --ink-900:#0C1116; --purple-800:#301A38; --purple-600:#452450; --purple-500:#4F2A59;
+    --purple-400:#6B3A79; --purple-100:#F2EAF4; --white:#FFFFFF; --grey-50:#F6F8FA;
+    --grey-200:#DDE3EA; --grey-300:#C3CCD6; --grey-500:#7C8A98; --grey-600:#5D6B78; --grey-800:#333E48;
+    --red-600:#B3261E; --red-100:#FBE7E5; --green-600:#1C7A4A;
+    --radius-sm:4px; --radius-md:8px;
+    --font:"Archivo","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);background:var(--purple-500);color:var(--grey-800);
+       min-height:100vh;display:grid;place-items:center;padding:24px;
+       background-image:linear-gradient(135deg,var(--purple-600),var(--purple-800));}
+  .card{width:min(420px,100%);background:var(--white);border-radius:12px;
+        box-shadow:0 20px 50px rgba(12,17,22,.35);overflow:hidden}
+  .head{padding:32px 32px 20px}
+  .mark{font-weight:700;font-size:28px;letter-spacing:-0.02em;color:var(--ink-900);line-height:1}
+  .sub{font-size:13px;font-weight:500;color:var(--purple-500);margin-top:6px}
+  .body{padding:4px 32px 28px}
+  .field{margin-bottom:16px}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--grey-600);margin-bottom:6px}
+  .field input{width:100%;font-family:inherit;font-size:14px;border:1px solid var(--grey-300);
+               border-radius:var(--radius-sm);padding:0 14px;height:44px;color:var(--ink-900)}
+  .field input:focus{outline:2px solid var(--purple-500);outline-offset:1px}
+  .btn{width:100%;font-family:inherit;font-size:15px;font-weight:600;background:var(--purple-500);
+       color:#fff;border:none;border-radius:var(--radius-sm);height:46px;cursor:pointer;margin-top:4px}
+  .btn:hover{background:var(--purple-700,#3E2248)}
+  .err{background:var(--red-100);color:var(--red-600);border:1px solid #f2c4c0;border-radius:var(--radius-sm);
+       padding:11px 14px;font-size:13px;margin-bottom:18px}
+  .demo{background:var(--grey-50);border-top:1px solid var(--grey-200);padding:18px 32px 24px}
+  .demo h3{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--grey-500);font-weight:700;margin-bottom:12px}
+  .demo table{width:100%;border-collapse:collapse;font-size:12.5px}
+  .demo td{padding:5px 0;color:var(--grey-800)}
+  .demo td.u{font-family:var(--mono);font-weight:600;color:var(--purple-500)}
+  .demo td.r{text-align:right;color:var(--grey-500)}
+  .demo .hint{font-size:12px;color:var(--grey-500);margin-top:12px;line-height:1.5}
+  .demo a{color:var(--purple-500);cursor:pointer;text-decoration:none;font-weight:600}
+  .demo a:hover{text-decoration:underline}
+  .foot{text-align:center;font-size:11px;color:var(--grey-500);margin-top:18px}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="head">
+      <div class="mark">Compas</div>
+      <div class="sub">NLC Network Hub</div>
+    </div>
+    <div class="body">
+      {% if error %}<div class="err">{{ error }}</div>{% endif %}
+      <form method="post" action="/login">
+        <div class="field">
+          <label>Username</label>
+          <input name="username" id="username" placeholder="e.g. daniel" autocomplete="username" autofocus required>
+        </div>
+        <div class="field">
+          <label>Password</label>
+          <input name="password" id="password" type="password" placeholder="Password" autocomplete="current-password" required>
+        </div>
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+    </div>
+    <div class="demo">
+      <h3>Demo users — click to fill</h3>
+      <table>
+        {% for uid, u in demo_users.items() %}
+        <tr>
+          <td class="u"><a onclick="fill('{{ uid }}','{{ u.password }}')">{{ uid }}</a></td>
+          <td>{{ u.name }}</td>
+          <td class="r">{{ u.role }}</td>
+        </tr>
+        {% endfor %}
+      </table>
+      <div class="hint">This is a demo login. Passwords are <b>nlc</b> (staff) and <b>dealer</b> (dealers). Real sign-in would use your Microsoft account.</div>
+    </div>
+  </div>
+  <div class="foot" style="color:rgba(255,255,255,.5)">Internal use only · National Learning Centre</div>
+  <script>
+    function fill(u,p){
+      document.getElementById('username').value=u;
+      document.getElementById('password').value=p;
+      document.getElementById('password').focus();
+    }
+  </script>
+</body>
+</html>

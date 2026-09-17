@@ -16,12 +16,43 @@ cached; the DB connection is reused. Same pattern as the fast test app.
 """
 import os
 import threading
+import functools
 import pyodbc
-from flask import Flask, request, redirect, render_template
+from flask import Flask, request, redirect, render_template, session, url_for
 from azure.identity import DefaultAzureCredential
 from azure.keyvault.secrets import SecretClient
 
 app = Flask(__name__)
+# Session secret. In Azure this comes from an env var; locally a default is fine.
+# Sessions are how the mock login "remembers" who is logged in across pages.
+app.secret_key = os.environ.get("FLASK_SECRET", "compas-demo-not-secret")
+
+# ---- Mock login: a short hardcoded list of demo users ----
+# NOTE: this is a DEMO gate only - passwords live in code, it is not real
+# security. Real authentication (Entra ID) comes with the Django build.
+# Each user has a role, which controls what they see (staff vs dealer).
+DEMO_USERS = {
+    "daniel":  {"password": "nlc",   "name": "Daniel",         "role": "staff",  "initials": "DR", "sub": "Network Engagement"},
+    "priya":   {"password": "nlc",   "name": "Priya S.",       "role": "staff",  "initials": "PS", "sub": "Training Support"},
+    "swansway":{"password": "dealer","name": "Swansway CUPRA", "role": "dealer", "initials": "SW", "sub": "Dealer - CUPRA"},
+    "sytner":  {"password": "dealer","name": "Sytner Audi",    "role": "dealer", "initials": "SA", "sub": "Dealer - Audi"},
+}
+
+
+def login_required(view):
+    """Redirect to the login page if there's no logged-in user in the session."""
+    @functools.wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+    return wrapped
+
+
+def current_user():
+    """Return the logged-in user's record, or None."""
+    uid = session.get("user")
+    return DEMO_USERS.get(uid) if uid else None
 
 _password = None
 _conn = None
@@ -187,8 +218,32 @@ ICONS = dict(
 )
 
 
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = ""
+    if request.method == "POST":
+        uid = (request.form.get("username") or "").strip().lower()
+        pw = (request.form.get("password") or "").strip()
+        user = DEMO_USERS.get(uid)
+        if user and user["password"] == pw:
+            session["user"] = uid
+            return redirect(url_for("home"))
+        error = "Wrong username or password. Try one of the demo users below."
+    if "user" in session:
+        return redirect(url_for("home"))
+    return render_template("login.html", error=error, demo_users=DEMO_USERS, **ICONS)
+
+
+@app.route("/logout")
+def logout():
+    session.pop("user", None)
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def home():
+    user = current_user()
     error = ""
     data = dict(tickets=[], contacts=[], action_items=[], open_count=0, high_count=0,
                 open_action_count=0, ticket_count=0, contact_count=0)
@@ -197,10 +252,11 @@ def home():
         data = fetch_all()
     except Exception as e:
         error = str(e)
-    return render_template("dashboard.html", error=error, **data, **ICONS)
+    return render_template("dashboard.html", error=error, user=user, **data, **ICONS)
 
 
 @app.route("/add-ticket", methods=["POST"])
+@login_required
 def add_ticket():
     subject = (request.form.get("subject") or "").strip()
     requester = (request.form.get("requester") or "").strip()
@@ -215,10 +271,23 @@ def add_ticket():
                 subject, requester, site, channel, priority)
         except Exception:
             pass
+    # Return to wherever the form was submitted from.
+    if request.form.get("from") == "help":
+        return redirect(url_for("help_page", sent="1"))
     return redirect("/#contact")
 
 
+@app.route("/help", methods=["GET"])
+@login_required
+def help_page():
+    """A dedicated page housing the full ticketing form."""
+    user = current_user()
+    sent = request.args.get("sent") == "1"
+    return render_template("help.html", user=user, sent=sent, **ICONS)
+
+
 @app.route("/add-contact", methods=["POST"])
+@login_required
 def add_contact():
     name = (request.form.get("name") or "").strip()
     dealer = (request.form.get("dealer") or "").strip()
@@ -233,6 +302,7 @@ def add_contact():
 
 
 @app.route("/add-action", methods=["POST"])
+@login_required
 def add_action():
     title = (request.form.get("title") or "").strip()
     due = (request.form.get("due") or "").strip()
@@ -246,6 +316,7 @@ def add_action():
 
 
 @app.route("/toggle-action", methods=["POST"])
+@login_required
 def toggle_action():
     action_id = request.form.get("id")
     if action_id:

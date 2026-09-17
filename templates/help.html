@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Help · Compas</title>
+<style>
+  :root{
+    --ink-900:#0C1116; --ink-700:#1E2831; --purple-700:#3E2248; --purple-600:#452450;
+    --purple-500:#4F2A59; --purple-100:#F2EAF4; --white:#FFFFFF; --grey-50:#F6F8FA;
+    --grey-100:#EDF1F5; --grey-200:#DDE3EA; --grey-300:#C3CCD6; --grey-500:#7C8A98;
+    --grey-600:#5D6B78; --grey-800:#333E48; --green-600:#1C7A4A; --green-100:#E4F3EB;
+    --red-600:#B3261E;
+    --text-heading:var(--ink-900); --text-body:var(--grey-800); --text-muted:var(--grey-600);
+    --surface-page:var(--white); --surface-sunken:var(--grey-50); --surface-card:var(--white);
+    --border-subtle:var(--grey-200); --border-strong:var(--grey-300);
+    --accent:var(--purple-500); --accent-hover:var(--purple-700); --accent-on:var(--white); --accent-soft:var(--purple-100);
+    --radius-sm:4px; --radius-md:8px; --radius-pill:999px; --control-h-sm:40px;
+    --shadow-sm:0 1px 2px rgba(12,17,22,.06),0 1px 1px rgba(12,17,22,.04);
+    --font:"Archivo","Segoe UI",Roboto,Helvetica,Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);font-size:13px;line-height:1.55;background:var(--surface-sunken);color:var(--text-body);-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-weight:700;letter-spacing:-0.01em;color:var(--text-heading)}
+  a{color:var(--accent);text-decoration:none}
+  .app{display:grid;grid-template-columns:264px minmax(0,1fr);min-height:100vh}
+  .rail{background:var(--surface-page);display:flex;flex-direction:column;position:sticky;top:0;height:100vh;padding:24px 20px;border-right:1px solid var(--border-subtle)}
+  .brand{padding:4px 0 24px}
+  .brand .mark{font-weight:700;font-size:24px;letter-spacing:-0.02em;color:var(--text-heading);line-height:1}
+  .brand .sub{font-size:12px;font-weight:500;color:var(--accent);margin-top:7px}
+  .rail-label{font-size:12px;font-weight:500;color:var(--text-muted);padding:20px 0 10px;border-top:1px solid var(--border-subtle)}
+  .nav{display:flex;flex-direction:column;gap:2px}
+  .nav a{display:flex;align-items:center;gap:11px;border-left:3px solid transparent;color:var(--text-muted);font-size:13.5px;font-weight:600;padding:11px 12px;cursor:pointer;transition:background .2s}
+  .nav a:hover{background:var(--surface-sunken);color:var(--text-heading)}
+  .nav a.active{background:var(--accent-soft);border-left-color:var(--accent);color:var(--accent)}
+  .nav a.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
+  .ico{width:18px;height:18px;flex:none}
+  .rail-foot{margin-top:auto;padding-top:24px}
+  .whoami{display:flex;align-items:center;gap:12px;border-top:1px solid var(--border-subtle);padding-top:18px}
+  .whoami .avatar{width:36px;height:36px;border-radius:var(--radius-sm);background:var(--accent);color:var(--accent-on);font-weight:700;font-size:13px;display:grid;place-items:center;flex:none}
+  .whoami .who-name{font-size:12.5px;font-weight:700;color:var(--text-heading);line-height:1.3}
+  .whoami .who-role{font-size:11px;font-weight:600;letter-spacing:.06em;color:var(--text-muted)}
+  .whoami .logout{margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:600}
+  .main{display:flex;flex-direction:column;min-width:0}
+  .topbar{display:flex;align-items:center;gap:16px;padding:26px 32px 22px;border-bottom:1px solid var(--border-subtle);background:var(--surface-page)}
+  .crumb{font-size:12px;color:var(--text-muted);margin-bottom:4px}
+  .crumb a{font-weight:600}
+  .greeting h1{font-size:22px;line-height:1.15}
+  .greeting p{font-size:13px;color:var(--text-muted);margin-top:6px}
+  .content{padding:28px 32px 56px;max-width:760px}
+  .panel{background:var(--surface-card);border:1px solid var(--border-subtle);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border-subtle)}
+  .panel-head h2{font-size:15px}
+  .panel-head .hint{font-size:12px;color:var(--text-muted)}
+  .live-badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:var(--radius-pill)}
+  form.big{padding:22px 20px;display:grid;gap:16px;grid-template-columns:1fr 1fr}
+  form.big .full{grid-column:1 / -1}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--text-muted);margin-bottom:5px}
+  .field input,.field select,.field textarea{width:100%;font-family:inherit;font-size:14px;border:1px solid var(--border-strong);border-radius:var(--radius-sm);padding:0 12px;height:var(--control-h-sm);background:var(--surface-page);color:var(--text-body)}
+  .field textarea{height:auto;padding:10px 12px;resize:vertical;min-height:90px}
+  .field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;background:var(--accent);color:var(--accent-on);border:none;border-radius:var(--radius-sm);padding:0 18px;height:42px;cursor:pointer}
+  .btn:hover{background:var(--accent-hover)}
+  .btn-row{display:flex;align-items:center;gap:14px}
+  .btn-row .hint{font-size:12px;color:var(--text-muted)}
+  .sent{background:var(--green-100);color:var(--green-600);border:1px solid #bfe3cd;border-radius:var(--radius-md);padding:14px 16px;font-size:13.5px;font-weight:600;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .sent svg{width:18px;height:18px}
+  @media (max-width:1080px){
+    .app{grid-template-columns:1fr}
+    .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 16px}
+    .brand{padding:0} .rail-label,.nav a .ico{display:none}
+    .nav{flex-direction:row;flex-wrap:wrap;gap:6px;margin-left:auto}
+    .nav a{border-left:none;padding:7px 11px}
+    .rail-foot{margin:0;padding:0;width:100%}
+    form.big{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><div class="mark">Compas</div><div class="sub">NLC Network Hub</div></div>
+    <div class="rail-label">Workspace</div>
+    <nav class="nav">
+      <a href="/">{{ ico_home | safe }} Dashboard</a>
+      <a href="/help" class="active">{{ ico_contact | safe }} Help &amp; tickets</a>
+      <a class="disabled">{{ ico_reports | safe }} Reports</a>
+      <a class="disabled">{{ ico_forms | safe }} Forms</a>
+      <a class="disabled">{{ ico_hub | safe }} The hub</a>
+    </nav>
+    <div class="rail-foot">
+      <div class="whoami">
+        <div class="avatar">{{ user.initials }}</div>
+        <div>
+          <div class="who-name">{{ user.name }}</div>
+          <div class="who-role">{{ user.sub }}</div>
+        </div>
+        <a href="/logout" class="logout">Sign out</a>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="greeting">
+        <div class="crumb"><a href="/">Dashboard</a> › Help &amp; tickets</div>
+        <h1>Raise a ticket</h1>
+        <p>Send a query to the NLC. We'll pick it up and reply through the portal.</p>
+      </div>
+    </header>
+
+    <div class="content">
+      {% if sent %}
+      <div class="sent">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5L20 7"/></svg>
+        Your ticket has been raised and saved. The NLC will be in touch.
+      </div>
+      {% endif %}
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2>New ticket</h2>
+          <span class="live-badge">Live</span>
+          <span class="hint">Saves to Azure SQL</span>
+        </div>
+        <form class="big" method="post" action="/add-ticket">
+          <input type="hidden" name="from" value="help">
+          <div class="field full">
+            <label>What do you need help with?</label>
+            <input name="subject" placeholder="Short summary of your query" maxlength="300" required autofocus>
+          </div>
+          <div class="field">
+            <label>Your name</label>
+            <input name="requester" placeholder="Who's raising this?" maxlength="200" required>
+          </div>
+          <div class="field">
+            <label>Dealer / site</label>
+            <input name="site" placeholder="Where are you?" maxlength="200">
+          </div>
+          <div class="field">
+            <label>How did this come in?</label>
+            <select name="channel">
+              <option value="ticket">Web form</option>
+              <option value="email">Email</option>
+              <option value="whatsapp">WhatsApp</option>
+              <option value="phone">Phone</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Priority</label>
+            <select name="priority">
+              <option value="high">High</option>
+              <option value="med" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div class="btn-row full">
+            <button type="submit" class="btn">Raise ticket</button>
+            <span class="hint">You'll be able to track this in the portal.</span>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

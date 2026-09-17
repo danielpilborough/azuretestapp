@@ -167,6 +167,7 @@
       <a href="#contact">{{ ico_contact | safe }} Contact <span class="count live">{{ open_count }}</span></a>
       <a href="#contacts">{{ ico_users | safe }} Contacts <span class="count live">{{ contact_count }}</span></a>
       <a href="#actions">{{ ico_actions | safe }} Actions <span class="count live">{{ open_action_count }}</span></a>
+      <a href="/help">{{ ico_forms | safe }} Help &amp; tickets</a>
       <a class="disabled" aria-disabled="true">{{ ico_reports | safe }} Reports</a>
       <a class="disabled" aria-disabled="true">{{ ico_forms | safe }} Forms</a>
       <a class="disabled" aria-disabled="true">{{ ico_comm | safe }} Communication</a>
@@ -180,11 +181,12 @@
     </nav>
     <div class="rail-foot">
       <div class="whoami">
-        <div class="avatar">DR</div>
+        <div class="avatar">{{ user.initials }}</div>
         <div>
-          <div class="who-name">Daniel</div>
-          <div class="who-role">NETWORK ENGAGEMENT</div>
+          <div class="who-name">{{ user.name }}</div>
+          <div class="who-role">{{ user.sub }}</div>
         </div>
+        <a href="/logout" class="logout" style="margin-left:auto;font-size:11px;color:var(--text-muted);font-weight:600">Sign out</a>
       </div>
     </div>
   </aside>
@@ -193,12 +195,12 @@
   <div class="main">
     <header class="topbar">
       <div class="greeting">
-        <h1>Good afternoon, Daniel</h1>
+        <h1>{% if user.role == 'dealer' %}Welcome, {{ user.name }}{% else %}Good afternoon, {{ user.name }}{% endif %}</h1>
         <p>Here is what needs you across the network today.</p>
       </div>
       <div class="right">
         <input class="search" type="text" placeholder="Search delegates, dealers, tickets" aria-label="Search">
-        <a href="#add-ticket" class="btn btn-primary" style="display:inline-flex;align-items:center;text-decoration:none">New ticket</a>
+        <a href="/help" class="btn btn-primary" style="display:inline-flex;align-items:center;text-decoration:none">New ticket</a>
       </div>
     </header>
 
@@ -239,6 +241,7 @@
               <h2>Contact queue</h2>
               <span class="live-badge">Live</span>
               <span class="hint">From the database</span>
+              <a href="/help" class="more" style="margin-left:auto;text-decoration:none">Open full form →</a>
             </div>
 
             <!-- Add ticket form (writes to SQL) -->
