@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Compas · Dealer portal</title>
+<style>
+  :root{
+    --ink-900:#0C1116; --purple-700:#3E2248; --purple-600:#452450; --purple-500:#4F2A59;
+    --purple-100:#F2EAF4; --white:#FFFFFF; --grey-50:#F6F8FA; --grey-100:#EDF1F5;
+    --grey-200:#DDE3EA; --grey-300:#C3CCD6; --grey-500:#7C8A98; --grey-600:#5D6B78; --grey-800:#333E48;
+    --green-600:#1C7A4A; --green-100:#E4F3EB; --amber-600:#B26A00; --amber-100:#FBF0DC;
+    --red-600:#B3261E; --red-100:#FBE7E5;
+    --accent:var(--purple-500); --accent-hover:var(--purple-700); --accent-on:#fff; --accent-soft:var(--purple-100);
+    --radius-sm:4px; --radius-md:8px; --radius-pill:999px; --control-h:42px;
+    --shadow-sm:0 1px 2px rgba(12,17,22,.06),0 1px 1px rgba(12,17,22,.04);
+    --font:"Archivo","Segoe UI",Roboto,Helvetica,Arial,sans-serif; --mono:"IBM Plex Mono",ui-monospace,monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--font);font-size:14px;line-height:1.55;background:var(--grey-50);color:var(--grey-800);-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-weight:700;letter-spacing:-0.01em;color:var(--ink-900)}
+  .topbar{background:var(--purple-500);color:#fff;padding:16px 24px;display:flex;align-items:center;gap:14px}
+  .topbar .mark{font-weight:700;font-size:20px;letter-spacing:-0.02em}
+  .topbar .sub{font-size:12px;color:var(--purple-100);opacity:.9}
+  .topbar .who{margin-left:auto;font-size:12.5px;color:var(--purple-100);display:flex;align-items:center;gap:14px}
+  .topbar .who a{color:#fff;text-decoration:none;font-weight:600;opacity:.85}
+  .wrap{max-width:820px;margin:0 auto;padding:28px 24px 56px}
+  .intro h1{font-size:24px;margin-bottom:4px}
+  .intro p{color:var(--grey-600);font-size:13.5px;margin-bottom:24px}
+  .grid{display:grid;grid-template-columns:1fr;gap:22px}
+  .panel{background:var(--white);border:1px solid var(--grey-200);border-radius:var(--radius-md);box-shadow:var(--shadow-sm);overflow:hidden}
+  .panel-head{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--grey-200)}
+  .panel-head h2{font-size:15px}
+  .panel-head .hint{font-size:12px;color:var(--grey-500)}
+  .live-badge{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);background:var(--accent-soft);padding:2px 7px;border-radius:var(--radius-pill)}
+  form.big{padding:20px;display:grid;gap:14px;grid-template-columns:1fr 1fr}
+  form.big .full{grid-column:1 / -1}
+  .field label{display:block;font-size:12px;font-weight:600;color:var(--grey-600);margin-bottom:5px}
+  .field input,.field select{width:100%;font-family:inherit;font-size:14px;border:1px solid var(--grey-300);border-radius:var(--radius-sm);padding:0 12px;height:var(--control-h);background:#fff;color:var(--grey-800)}
+  .field input:focus,.field select:focus{outline:2px solid var(--accent);outline-offset:1px}
+  .btn{font-family:inherit;font-size:14px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:0 18px;height:var(--control-h);cursor:pointer}
+  .btn:hover{background:var(--accent-hover)}
+  .btn-row{display:flex;align-items:center;gap:14px}
+  .btn-row .hint{font-size:12px;color:var(--grey-500)}
+  .sent{background:var(--green-100);color:var(--green-600);border:1px solid #bfe3cd;border-radius:var(--radius-md);padding:13px 16px;font-size:13.5px;font-weight:600;margin-bottom:22px;display:flex;align-items:center;gap:10px}
+  .sent svg{width:18px;height:18px}
+  .err{background:var(--red-100);color:var(--red-600);border:1px solid #f2c4c0;border-radius:var(--radius-md);padding:13px 16px;font-size:13px;margin-bottom:20px;word-break:break-word}
+  .q{display:grid;grid-template-columns:3px 1fr auto;gap:14px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--grey-200)}
+  .q:last-child{border-bottom:none}
+  .q .bar{width:3px;height:36px;border-radius:2px}
+  .bar.high{background:var(--red-600)} .bar.med{background:var(--amber-600)} .bar.low{background:var(--grey-300)}
+  .q .subj{font-size:13.5px;font-weight:700;color:var(--ink-900)}
+  .q .meta{font-size:12px;color:var(--grey-500);margin-top:3px}
+  .tag{font-size:11px;font-weight:600;padding:3px 8px;border-radius:var(--radius-sm)}
+  .tag.open{background:var(--red-100);color:var(--red-600)}
+  .tag.pending{background:var(--amber-100);color:var(--amber-600)}
+  .tag.progress{background:var(--accent-soft);color:var(--accent)}
+  .tag.resolved{background:var(--green-100);color:var(--green-600)}
+  .empty{padding:22px 20px;text-align:center;color:var(--grey-500);font-size:13px}
+  @media (max-width:640px){ form.big{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+  <div class="topbar">
+    <div>
+      <div class="mark">Compas</div>
+    </div>
+    <div class="sub">Dealer portal</div>
+    <div class="who">
+      <span>{{ user.name }}</span>
+      <a href="/logout">Sign out</a>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="intro">
+      <h1>Ask the NLC</h1>
+      <p>Raise a query and track its progress. We'll reply through the portal.</p>
+    </div>
+
+    {% if sent %}
+    <div class="sent">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 5 5L20 7"/></svg>
+      Your query has been sent. We'll be in touch.
+    </div>
+    {% endif %}
+    {% if error %}<div class="err"><b>Database error:</b> {{ error }}</div>{% endif %}
+
+    <div class="grid">
+      <!-- Raise a ticket -->
+      <div class="panel">
+        <div class="panel-head"><h2>Raise a query</h2><span class="live-badge">Live</span></div>
+        <form class="big" method="post" action="/add-ticket">
+          <div class="field full">
+            <label>What do you need help with?</label>
+            <input name="subject" placeholder="Short summary" maxlength="300" required autofocus>
+          </div>
+          <div class="field">
+            <label>Your name</label>
+            <input name="requester" placeholder="Who's asking?" maxlength="200" required>
+          </div>
+          <div class="field">
+            <label>Priority</label>
+            <select name="priority">
+              <option value="high">High</option>
+              <option value="med" selected>Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <input type="hidden" name="channel" value="ticket">
+          <div class="btn-row full">
+            <button type="submit" class="btn">Send query</button>
+            <span class="hint">Goes straight to the NLC.</span>
+          </div>
+        </form>
+      </div>
+
+      <!-- My queries -->
+      <div class="panel">
+        <div class="panel-head"><h2>My queries</h2><span class="hint">Everything you've raised</span></div>
+        {% for t in tickets %}
+        <div class="q">
+          <div class="bar {{ t.priority }}"></div>
+          <div>
+            <div class="subj">{{ t.subject }}</div>
+            <div class="meta">{{ t.requester }}{% if t.site %} · {{ t.site }}{% endif %}</div>
+          </div>
+          <div><span class="tag {{ t.status }}">{{ {'open':'Open','pending':'Pending','progress':'In progress','resolved':'Resolved'}.get(t.status, t.status) }}</span></div>
+        </div>
+        {% else %}
+        <div class="empty">You haven't raised any queries yet. Use the form above.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

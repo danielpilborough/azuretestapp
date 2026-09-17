@@ -27,16 +27,21 @@ app = Flask(__name__)
 # Sessions are how the mock login "remembers" who is logged in across pages.
 app.secret_key = os.environ.get("FLASK_SECRET", "compas-demo-not-secret")
 
-# ---- Mock login: a short hardcoded list of demo users ----
-# NOTE: this is a DEMO gate only - passwords live in code, it is not real
-# security. Real authentication (Entra ID) comes with the Django build.
-# Each user has a role, which controls what they see (staff vs dealer).
+# ---- Mock login: three roles ----
+# NOTE: demo gate only - passwords in code, not real security. Real auth
+# (Entra ID) comes with the Django build.
+#   admin  - sees everything
+#   user   - standard staff; sees a restricted subset of data
+#   dealer - external; simple "raise a ticket + my queries" view only
 DEMO_USERS = {
-    "daniel":  {"password": "nlc",   "name": "Daniel",         "role": "staff",  "initials": "DR", "sub": "Network Engagement"},
-    "priya":   {"password": "nlc",   "name": "Priya S.",       "role": "staff",  "initials": "PS", "sub": "Training Support"},
-    "swansway":{"password": "dealer","name": "Swansway CUPRA", "role": "dealer", "initials": "SW", "sub": "Dealer - CUPRA"},
-    "sytner":  {"password": "dealer","name": "Sytner Audi",    "role": "dealer", "initials": "SA", "sub": "Dealer - Audi"},
+    "admin":  {"password": "admin",  "name": "Admin",       "role": "admin",  "initials": "AD", "sub": "Full access"},
+    "user":   {"password": "user",   "name": "Staff User",  "role": "user",   "initials": "SU", "sub": "Standard access"},
+    "dealer": {"password": "dealer", "name": "Dealer",      "role": "dealer", "initials": "DL", "sub": "Dealer portal"},
 }
+
+# Which staff member the "user" role is scoped to (their own assigned work).
+# In a real app this would be the logged-in person's own identity.
+USER_SCOPE_NAME = "Staff User"
 
 
 def login_required(view):
@@ -105,8 +110,19 @@ def ensure_tables():
             channel NVARCHAR(40) NOT NULL DEFAULT 'email',
             priority NVARCHAR(20) NOT NULL DEFAULT 'med',
             status NVARCHAR(20) NOT NULL DEFAULT 'open',
+            assigned_to NVARCHAR(200) NULL,
+            raised_by NVARCHAR(200) NULL,
             created_at DATETIME2 DEFAULT SYSDATETIME()
         )
+    """)
+    # Migrate: add the two role columns if an older tickets table already exists.
+    cur.execute("""
+        IF COL_LENGTH('tickets', 'assigned_to') IS NULL
+        ALTER TABLE tickets ADD assigned_to NVARCHAR(200) NULL
+    """)
+    cur.execute("""
+        IF COL_LENGTH('tickets', 'raised_by') IS NULL
+        ALTER TABLE tickets ADD raised_by NVARCHAR(200) NULL
     """)
     cur.execute("""
         IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'contacts')
@@ -131,16 +147,18 @@ def ensure_tables():
     # Seed sample rows only if the tables are empty, so the demo looks populated.
     cur.execute("SELECT COUNT(*) FROM tickets")
     if cur.fetchone()[0] == 0:
+        # (subject, requester, site, channel, priority, status, assigned_to, raised_by)
         seed = [
-            ("Accreditation certificate not showing", "J. Okafor", "Sytner Audi Leeds", "whatsapp", "high", "open"),
-            ("Course code AUD-334 booking failed", "Booking desk", "Marshall VW Peterborough", "phone", "high", "open"),
-            ("New starter account request (x3)", "L. Freeman", "TPS Birmingham", "email", "med", "pending"),
-            ("Question about CUPRA training path", "Booking desk", "Swansway CUPRA", "email", "med", "progress"),
-            ("Feedback: LEAP module 4 content", "R. Green", "Skoda Derby", "ticket", "med", "open"),
+            ("Accreditation certificate not showing", "J. Okafor", "Sytner Audi Leeds", "whatsapp", "high", "open", "Staff User", "Dealer"),
+            ("Course code AUD-334 booking failed", "Booking desk", "Marshall VW Peterborough", "phone", "high", "open", None, None),
+            ("New starter account request (x3)", "L. Freeman", "TPS Birmingham", "email", "med", "pending", "Priya S.", None),
+            ("Question about CUPRA training path", "Booking desk", "Swansway CUPRA", "email", "med", "progress", "Staff User", "Dealer"),
+            ("Feedback: LEAP module 4 content", "R. Green", "Skoda Derby", "ticket", "med", "open", None, None),
+            ("Portal login not working", "Dealer", "Swansway CUPRA", "ticket", "low", "open", "Priya S.", "Dealer"),
         ]
         for row in seed:
             cur.execute(
-                "INSERT INTO tickets (subject, requester, site, channel, priority, status) VALUES (?,?,?,?,?,?)",
+                "INSERT INTO tickets (subject, requester, site, channel, priority, status, assigned_to, raised_by) VALUES (?,?,?,?,?,?,?,?)",
                 *row)
     cur.execute("SELECT COUNT(*) FROM contacts")
     if cur.fetchone()[0] == 0:
@@ -163,20 +181,37 @@ def ensure_tables():
             cur.execute("INSERT INTO actions (title, due, done) VALUES (?,?,?)", *row)
 
 
-def fetch_all():
-    """Read the live data and derive a couple of stats. Returns a dict for the template."""
+def fetch_all(role="admin"):
+    """
+    Read the live data, filtered by role, and derive stats.
+      admin  - every ticket
+      user   - only tickets assigned to them, or unassigned (their workload)
+      dealer - only tickets they raised
+    The filtering is real SQL (a WHERE clause), not a cosmetic hide.
+    """
     cur = get_cursor()
-    cur.execute("""
-        SELECT id, subject, requester, site, channel, priority, status
-        FROM tickets ORDER BY
-        CASE priority WHEN 'high' THEN 0 WHEN 'med' THEN 1 ELSE 2 END, id DESC
-    """)
+
+    base = """
+        SELECT id, subject, requester, site, channel, priority, status, assigned_to, raised_by
+        FROM tickets
+    """
+    order = " ORDER BY CASE priority WHEN 'high' THEN 0 WHEN 'med' THEN 1 ELSE 2 END, id DESC"
+
+    if role == "dealer":
+        cur.execute(base + " WHERE raised_by = ?" + order, "Dealer")
+    elif role == "user":
+        # Their own assigned work, plus anything unassigned (up for grabs).
+        cur.execute(base + " WHERE assigned_to = ? OR assigned_to IS NULL" + order, USER_SCOPE_NAME)
+    else:  # admin
+        cur.execute(base + order)
+
     tickets = [dict(id=r[0], subject=r[1], requester=r[2], site=r[3],
-                    channel=r[4], priority=r[5], status=r[6]) for r in cur.fetchall()]
+                    channel=r[4], priority=r[5], status=r[6],
+                    assigned_to=r[7], raised_by=r[8]) for r in cur.fetchall()]
+
     cur.execute("SELECT id, name, dealer, email FROM contacts ORDER BY id DESC")
     contacts = [dict(id=r[0], name=r[1], dealer=r[2], email=r[3]) for r in cur.fetchall()]
 
-    # Actions: not-done first (newest first within each group)
     cur.execute("SELECT id, title, due, done FROM actions ORDER BY done ASC, id DESC")
     action_items = [dict(id=r[0], title=r[1], due=r[2], done=bool(r[3])) for r in cur.fetchall()]
 
@@ -244,34 +279,60 @@ def logout():
 @login_required
 def home():
     user = current_user()
+    # Dealers get a simple, separate view - not the internal dashboard.
+    if user["role"] == "dealer":
+        return redirect(url_for("dealer_home"))
     error = ""
     data = dict(tickets=[], contacts=[], action_items=[], open_count=0, high_count=0,
                 open_action_count=0, ticket_count=0, contact_count=0)
     try:
         ensure_tables()
-        data = fetch_all()
+        data = fetch_all(role=user["role"])
     except Exception as e:
         error = str(e)
     return render_template("dashboard.html", error=error, user=user, **data, **ICONS)
 
 
+@app.route("/dealer")
+@login_required
+def dealer_home():
+    """Dealer portal: raise a ticket + see only the queries they raised."""
+    user = current_user()
+    if user["role"] != "dealer":
+        return redirect(url_for("home"))
+    error = ""
+    tickets = []
+    try:
+        ensure_tables()
+        tickets = fetch_all(role="dealer")["tickets"]
+    except Exception as e:
+        error = str(e)
+    sent = request.args.get("sent") == "1"
+    return render_template("dealer.html", user=user, tickets=tickets, error=error, sent=sent, **ICONS)
+
+
 @app.route("/add-ticket", methods=["POST"])
 @login_required
 def add_ticket():
+    user = current_user()
     subject = (request.form.get("subject") or "").strip()
     requester = (request.form.get("requester") or "").strip()
     site = (request.form.get("site") or "").strip()
     channel = (request.form.get("channel") or "email").strip()
     priority = (request.form.get("priority") or "med").strip()
+    # A dealer's ticket is tagged so it shows only in their view.
+    raised_by = "Dealer" if user and user["role"] == "dealer" else None
     if subject and requester:
         try:
             cur = get_cursor()
             cur.execute(
-                "INSERT INTO tickets (subject, requester, site, channel, priority, status) VALUES (?,?,?,?,?,'open')",
-                subject, requester, site, channel, priority)
+                "INSERT INTO tickets (subject, requester, site, channel, priority, status, raised_by) VALUES (?,?,?,?,?,'open',?)",
+                subject, requester, site, channel, priority, raised_by)
         except Exception:
             pass
     # Return to wherever the form was submitted from.
+    if user and user["role"] == "dealer":
+        return redirect(url_for("dealer_home", sent="1"))
     if request.form.get("from") == "help":
         return redirect(url_for("help_page", sent="1"))
     return redirect("/#contact")
@@ -280,8 +341,10 @@ def add_ticket():
 @app.route("/help", methods=["GET"])
 @login_required
 def help_page():
-    """A dedicated page housing the full ticketing form."""
+    """A dedicated page housing the full ticketing form (staff only)."""
     user = current_user()
+    if user["role"] == "dealer":
+        return redirect(url_for("dealer_home"))
     sent = request.args.get("sent") == "1"
     return render_template("help.html", user=user, sent=sent, **ICONS)
 

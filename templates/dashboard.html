@@ -165,8 +165,10 @@
     <nav class="nav">
       <a href="#" class="active">{{ ico_home | safe }} Dashboard</a>
       <a href="#contact">{{ ico_contact | safe }} Contact <span class="count live">{{ open_count }}</span></a>
+      {% if user.role == 'admin' %}
       <a href="#contacts">{{ ico_users | safe }} Contacts <span class="count live">{{ contact_count }}</span></a>
       <a href="#actions">{{ ico_actions | safe }} Actions <span class="count live">{{ open_action_count }}</span></a>
+      {% endif %}
       <a href="/help">{{ ico_forms | safe }} Help &amp; tickets</a>
       <a class="disabled" aria-disabled="true">{{ ico_reports | safe }} Reports</a>
       <a class="disabled" aria-disabled="true">{{ ico_forms | safe }} Forms</a>
@@ -287,7 +289,8 @@
             {% endfor %}
           </div>
 
-          <!-- LIVE contacts -->
+          <!-- LIVE contacts (admin only) -->
+          {% if user.role == 'admin' %}
           <div class="panel" id="contacts">
             <div class="panel-head">
               <h2>Contacts</h2>
@@ -315,11 +318,13 @@
             <div class="section-note">No contacts yet. Add the first one above.</div>
             {% endfor %}
           </div>
+          {% endif %}
         </div>
 
         <!-- Side column -->
         <div>
-          <!-- LIVE actions -->
+          <!-- LIVE actions (admin only) -->
+          {% if user.role == 'admin' %}
           <div class="panel" id="actions">
             <div class="panel-head">
               <h2>Your actions</h2>
@@ -360,6 +365,12 @@
               <div class="row"><div class="time">11:03</div><div class="text">Delegate review started for R. Green</div></div>
             </div>
           </div>
+          {% else %}
+          <div class="panel">
+            <div class="panel-head"><h2>Your workload</h2><span class="live-badge">Live</span></div>
+            <div class="section-note" style="border-top:none">You're seeing tickets assigned to you plus anything unassigned. Contacts, actions and the wider activity feed are admin-only.</div>
+          </div>
+          {% endif %}
         </div>
       </section>
     </div>
