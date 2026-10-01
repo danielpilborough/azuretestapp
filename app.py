@@ -12,9 +12,11 @@ A couple of dashboard stats (open ticket count, contact count) are derived
 from the live data too, so numbers on the page reflect the database.
 
 Secrets: the SQL password is fetched once from Key Vault at startup and
-cached; the DB connection is reused. Same pattern as the fast test app.
+cached. Each worker thread keeps its own reused DB connection, and table
+setup runs once per process rather than on every request.
 """
 import os
+import time
 import threading
 import functools
 import pyodbc
@@ -63,18 +65,33 @@ def current_user():
     return DEMO_USERS.get(uid) if uid else None
 
 _password = None
-_conn = None
-_lock = threading.Lock()
+_password_lock = threading.Lock()
+
+# One database connection PER THREAD. pyodbc connections must not be shared
+# between threads, and a single shared connection forces every request on the
+# replica to queue behind the one before it.
+_local = threading.local()
+
+# Only re-check a connection with "SELECT 1" if it has sat idle this long.
+# Azure SQL can drop idle connections, but checking on every call adds a full
+# database round trip to every request.
+IDLE_CHECK_SECONDS = 60
+
+# Table setup runs once per process, not on every page load.
+_tables_ready = False
+_tables_lock = threading.Lock()
 
 
 def get_db_password():
     global _password
     if _password is None:
-        vault_url = os.environ["KEYVAULT_URL"]
-        secret_name = os.environ.get("DB_PASSWORD_SECRET", "sql-password")
-        credential = DefaultAzureCredential()
-        client = SecretClient(vault_url=vault_url, credential=credential)
-        _password = client.get_secret(secret_name).value
+        with _password_lock:
+            if _password is None:
+                vault_url = os.environ["KEYVAULT_URL"]
+                secret_name = os.environ.get("DB_PASSWORD_SECRET", "sql-password")
+                credential = DefaultAzureCredential()
+                client = SecretClient(vault_url=vault_url, credential=credential)
+                _password = client.get_secret(secret_name).value
     return _password
 
 
@@ -89,18 +106,34 @@ def _new_connection():
 
 
 def get_cursor():
-    global _conn
-    with _lock:
-        if _conn is None:
-            _conn = _new_connection()
+    """Return a cursor on this thread's own, reused connection."""
+    conn = getattr(_local, "conn", None)
+    now = time.monotonic()
+    if conn is None:
+        conn = _new_connection()
+    elif now - getattr(_local, "last_used", 0) > IDLE_CHECK_SECONDS:
+        # Idle for a while: make sure Azure SQL hasn't dropped it.
         try:
-            _conn.cursor().execute("SELECT 1")
+            conn.cursor().execute("SELECT 1")
         except pyodbc.Error:
-            _conn = _new_connection()
-        return _conn.cursor()
+            conn = _new_connection()
+    _local.conn = conn
+    _local.last_used = now
+    return conn.cursor()
 
 
 def ensure_tables():
+    """Run table setup once per process; later calls return immediately."""
+    global _tables_ready
+    if _tables_ready:
+        return
+    with _tables_lock:
+        if not _tables_ready:
+            _create_tables()
+            _tables_ready = True
+
+
+def _create_tables():
     """Create the two live tables the first time, and seed a little sample data."""
     cur = get_cursor()
     cur.execute("""
